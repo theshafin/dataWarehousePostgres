@@ -54,9 +54,9 @@ WITH (
     NULL ''
 );
 
-CREATE TYPE SEGMENT AS ENUM (SELECT DISTINCT upper(segment) FROM staging_orders)
-CREATE TYPE P_CATEGORY AS ENUM (SELECT DISTINCT upper(trim(category)) FROM staging_orders)
-CREATE TYPE REGION AS ENUM (SELECT DISTINCT upper(region) FROM staging_orders)
+CREATE TYPE SEGMENT AS ENUM (SELECT DISTINCT upper(segment) FROM staging_orders);
+CREATE TYPE P_CATEGORY AS ENUM (SELECT DISTINCT upper(trim(category)) FROM staging_orders);
+CREATE TYPE REGION AS ENUM (SELECT DISTINCT upper(region) FROM staging_orders);
 
 -- Originally intended to use enum, but there wasn't a good way to convert between each other.
 CREATE OR REPLACE FUNCTION month_text(SMALLINT)
