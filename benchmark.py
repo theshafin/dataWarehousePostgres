@@ -91,7 +91,7 @@ if __name__ == "__main__":
         report += "\nSystem detail: " + platform.processor()
 
         fname = "Non_Star_test_" + platform.processor() + ".txt"
-        with open("fname", "w") as f:
+        with open(fname, "w") as f:
             f.write(report)
 
         livedb.close()
