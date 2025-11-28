@@ -22,7 +22,7 @@ CREATE TABLE staging_orders (
     profit TEXT
 )
 
-COPY tableau_staging (
+COPY staging_orders (
     row_id,
     order_id,
     order_date,
