@@ -4,7 +4,7 @@ SELECT
     SUM(f.sales) AS total_sales,
     SUM(f.profit) AS total_profit
 FROM fact_sales f
-JOIN dim_date d ON f.date_key = d.date_key
+JOIN dim_date d ON f.date_key = d.timestamp
 GROUP BY d.year, d.month
 ORDER BY d.year, d.month;
 ------
@@ -47,7 +47,7 @@ WITH monthly AS (
         d.month,
         SUM(f.profit) AS monthly_profit
     FROM fact_sales f
-    JOIN dim_date d ON f.date_key = d.date_key
+    JOIN dim_date d ON f.date_key = d.timestamp
     GROUP BY d.year, d.month
 )
 SELECT

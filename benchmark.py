@@ -52,17 +52,21 @@ if __name__ == "__main__":
                             star_times[i][j] = dt
                         except (Exception, sql.DatabaseError) as error:
                             print(f"Error: {error}")
+                            live.execute('ROLLBACK')
+                            livedb.commit()
 
         report = np.array2string(star_times, separator=",")
-        report += "\nmeans: " + np.mean(star_times, axis=0)
-        report += "\nstds: " + np.std(star_times, axis=0)
-        report += "\nvariance: " + np.std(star_times, axis=0)
+        report += "\nmeans: " + str(np.mean(star_times, axis=1))
+        report += "\nstds: " + str(np.std(star_times, axis=1))
+        report += "\nvariance: " + str(np.std(star_times, axis=1))
         report += "\nAll numbers are in nanoseconds (ns)"
         report += "\nSystem detail: " + platform.processor()
         
-        with open("Star_test.txt", "x") as f:
+        fname = "Star_test_" + platform.processor() + ".txt"
+        with open(fname, "w") as f:
             f.write(report)
         
+        print("Performing Test for Data with non-Star Schema (As-is)")
         with open("OLAP_none_test.sql", mode="r", encoding="utf8") as f:
             queries = f.read().split("------")
             non_star_time = np.zeros(shape=(len(queries),runs), dtype=np.int64)
@@ -75,17 +79,21 @@ if __name__ == "__main__":
                             live.execute(query)
                             result = live.fetchall()
                             dt = timeit() - dt
-                            star_times[i][j] = dt
+                            non_star_time[i][j] = dt
                         except (Exception, sql.DatabaseError) as error:
                             print(f"Error: {error}")
 
         report = np.array2string(non_star_time, separator=",")
-        report += "\nmeans: " + np.mean(non_star_time, axis=0)
-        report += "\nstds: " + np.std(non_star_time, axis=0)
-        report += "\nvariance: " + np.std(non_star_time, axis=0)
+        report += "\nmeans: " + str(np.mean(non_star_time, axis=1))
+        report += "\nstds: " + str(np.std(non_star_time, axis=1))
+        report += "\nvariance: " + str(np.std(non_star_time, axis=1))
         report += "\nAll numbers are in nanoseconds (ns)"
         report += "\nSystem detail: " + platform.processor()
-        with open("Non_Star_test.txt", "x") as f:
+
+        fname = "Non_Star_test_" + platform.processor() + ".txt"
+        with open("fname", "w") as f:
             f.write(report)
 
         livedb.close()
+    else:
+        print("Environment Loading Failed!")

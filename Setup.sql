@@ -20,7 +20,7 @@ CREATE TABLE staging_orders (
     quantity TEXT,
     discount TEXT,
     profit TEXT
-)
+);
 
 COPY staging_orders (
     row_id,
