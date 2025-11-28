@@ -1,3 +1,5 @@
+DROP TABLE IF EXISTS staging_orders;
+
 CREATE TABLE staging_orders (
     row_id INT,
     order_id TEXT,
@@ -16,10 +18,10 @@ CREATE TABLE staging_orders (
     category TEXT,
     sub_category TEXT,
     product_name TEXT,
-    sales TEXT,
-    quantity TEXT,
-    discount TEXT,
-    profit TEXT
+    sales NUMERIC,
+    quantity INTEGER,
+    discount NUMERIC,
+    profit NUMERIC
 );
 
 COPY staging_orders (
@@ -45,7 +47,7 @@ COPY staging_orders (
     discount,
     profit
 ) 
-FROM './data/data.csv'
+FROM './data/manifests.csv'
 WITH (
     FORMAT CSV,
     HEADER true,
@@ -54,9 +56,7 @@ WITH (
     NULL ''
 );
 
-CREATE TYPE SEGMENT AS ENUM (SELECT DISTINCT upper(segment) FROM staging_orders);
-CREATE TYPE P_CATEGORY AS ENUM (SELECT DISTINCT upper(trim(category)) FROM staging_orders);
-CREATE TYPE REGION AS ENUM (SELECT DISTINCT upper(region) FROM staging_orders);
+
 
 -- Originally intended to use enum, but there wasn't a good way to convert between each other.
 CREATE OR REPLACE FUNCTION month_text(SMALLINT)
@@ -75,22 +75,26 @@ SELECT to_char($1, 'Q')
 $$ language sql;
 
 ----------------------------------------------------------------------------------
+DROP TABLE IF EXISTS fact_sales;
 
+DROP TABLE IF EXISTS dim_customer;
 CREATE TABLE dim_customer (
     customer_key      SERIAL PRIMARY KEY,
     customer_id       TEXT UNIQUE,
     customer_name     TEXT,
-    segment           SEGMENT,
+    segment           TEXT
 );
 
+DROP TABLE IF EXISTS dim_product;
 CREATE TABLE dim_product (
     product_key       SERIAL PRIMARY KEY,
     product_id        TEXT UNIQUE,
-    category          P_CATEGORY,
+    category          TEXT,
     sub_category      TEXT,
     product_name      TEXT
 );
 
+DROP TABLE IF EXISTS dim_date;
 CREATE TABLE dim_date (
     timestamp         TIMESTAMP PRIMARY KEY,
     year              SMALLINT,
@@ -100,15 +104,17 @@ CREATE TABLE dim_date (
     CHECK (day BETWEEN 1 AND 32)
 );
 
+DROP TABLE IF EXISTS dim_geography;
 CREATE TABLE dim_geography (
     geography_key     SERIAL PRIMARY KEY,
     country_region    TEXT,
     state_province    TEXT,
     city              TEXT,
     postal_code       TEXT,
-    region            REGION
+    region            TEXT
 );
 
+DROP TABLE IF EXISTS dim_ship_mode;
 CREATE TABLE dim_ship_mode (
     ship_mode_key     SERIAL PRIMARY KEY,
     ship_mode         TEXT UNIQUE
@@ -121,8 +127,8 @@ CREATE TABLE fact_sales (
     order_id          TEXT,
     customer_key      INTEGER REFERENCES dim_customer(customer_key),
     product_key       INTEGER REFERENCES dim_product(product_key),
-    date_key          INTEGER REFERENCES dim_date(date_key),
-    ship_date_key     INTEGER REFERENCES dim_date(date_key),
+    date_key          TIMESTAMP REFERENCES dim_date(timestamp),
+    ship_date_key     TIMESTAMP REFERENCES dim_date(timestamp),
     geography_key     INTEGER REFERENCES dim_geography(geography_key),
     ship_mode_key     INTEGER REFERENCES dim_ship_mode(ship_mode_key),
 
@@ -137,13 +143,13 @@ INSERT INTO dim_customer (customer_id, customer_name, segment)
 SELECT DISTINCT
     customer_id,
     customer_name,
-    upper(segment)::SEGMENT
+    segment
 FROM staging_orders;
 
-INSERT INTO dim_product (full_date, category, sub_category, product_name)
+INSERT INTO dim_product (product_id, category, sub_category, product_name)
 SELECT DISTINCT ON (product_id)
     TRIM(product_id),
-    uppter(TRIM(category))::P_CATEGORY,
+    TRIM(category),
     TRIM(sub_category),
     TRIM(product_name)
 FROM staging_orders
@@ -151,14 +157,14 @@ ORDER BY product_id;
 
 INSERT INTO dim_date (timestamp, year, month, day)
 SELECT
-    date + '00:00:00'::time as timestamp,
-    EXTRACT(YEAR FROM date)::INT AS year,
-    EXTRACT(MONTH FROM date)::INT AS month,
-    EXTRACT(DAY FROM date)::INT AS day,
+    tstamp,
+    EXTRACT(YEAR FROM tstamp)::INT AS year,
+    EXTRACT(MONTH FROM tstamp)::INT AS month,
+    EXTRACT(DAY FROM tstamp)::INT AS day
 FROM generate_series(
-    (SELECT MIN(dates) FROM (SELECT CONCAT(order_date, ship_date) as dates FROM staging_orders)), 
-    (SELECT MAX(dates) FROM (SELECT CONCAT(order_date, ship_date) as dates FROM staging_orders)),
-    '1 day'::interval) AS date;
+    (SELECT LEAST(MIN(order_date), MIN(ship_date)) FROM staging_orders), 
+    (SELECT GREATEST(MAX(order_date), MAX(ship_date)) FROM staging_orders),
+    '1 day'::interval) AS tstamp;
 
 INSERT INTO dim_geography (country_region, state_province, city, postal_code, region)
 SELECT DISTINCT
@@ -166,7 +172,7 @@ SELECT DISTINCT
     state_province,
     city,
     postal_code,
-    uppter(region)::REGION
+    region
 FROM staging_orders;
 
 INSERT INTO fact_sales (
